@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='ax520tool',
-    version='v0.1.1-alpha',
-    py_modules=['ax520tool'],
+    version='1.0.0',
+    packages=find_packages(),
     install_requires=[
         'pyserial',
         'tqdm'
@@ -22,7 +22,7 @@ setup(
     python_requires='>=3.6',  
     entry_points={
         'console_scripts': [
-            'ax520tool=ax520tool:main', 
+            'ax520tool=ax520tool.cli:main', 
         ],
     },
 )
