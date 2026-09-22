@@ -10,11 +10,11 @@ BOARD_DEFS = {
         'flash_start_addr': 0x3000000,
         'flash_range': (0x3000000, 0x3F42400),
         'partition': {
-            'miniboot': 0x3000000,
-            'uboot': 0x3006000,
-            'env': 0x302F000,
-            'kernel': 0x3030000,
-            'rootfs': 0x3130000
+            'miniboot': (0x3000000, 0x00),
+            'uboot': (0x3006000, 0x00),
+            'env': (0x302F000, 0x00),
+            'kernel': (0x3030000, 0x00),
+            'rootfs': (0x3130000, 0x00)
         }
     },
     'M5_TimerCamera520_V11': {
@@ -22,15 +22,25 @@ BOARD_DEFS = {
         'flash_start_addr': 0x3000000,
         'flash_range': (0x3000000, 0x3F42400),
         'partition': {
-            'comboot': 0x3000000,
-            'kernel': 0x3030000,
-            'rootfs': 0x3130000
+            'comboot': (0x3000000, 0x30000),
+            'kernel': (0x3030000, 0x100000),
+            'rootfs': (0x3130000, 0xED0000)
+        }
+    },
+    'M5_TimerCamera520_V12': {
+        'flash_size': 0xF42400,
+        'flash_start_addr': 0x3000000,
+        'flash_range': (0x3000000, 0x3F42400),
+        'partition': {
+            'comboot': (0x3000000, 0x30000),
+            'kernel': (0x3030000, 0x200000),
+            'rootfs': (0x3230000, 0xDD0000)
         }
     }
 }
 
 # Default board to use if not specified
-DEFAULT_BOARD = 'M5_TimerCamera520_V11'
+DEFAULT_BOARD = 'M5_TimerCamera520_V12'
 
 # Protocol constants
 class Protocol:

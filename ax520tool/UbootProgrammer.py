@@ -448,10 +448,6 @@ class UbootProgrammer:
             return False
             
         self._clear_uart()
-        
-        # Erase flash region first
-        if not self.erase(address, len(firmware_data)):
-            return False
             
         # Prepare for XMODEM transfer
         if not self._uboot_loadx():

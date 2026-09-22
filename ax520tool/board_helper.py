@@ -73,7 +73,7 @@ class BoardHelper:
         # Check not passing sector with name erase
         if partition:
             if partition in self.defs['partition']:
-                partition_addr = self.defs['partition'][partition]
+                partition_addr = self.defs['partition'][partition][0]
                 
                 # Check if operation would overlap with other partitions
                 for part_name, part_addr in self.defs['partition'].items():
@@ -86,18 +86,18 @@ class BoardHelper:
                         operation_end = partition_addr + size - 1
                         
                         # If another partition starts within our operation range
-                        if part_addr > partition_addr and part_addr <= operation_end:
+                        if part_addr[0] > partition_addr and part_addr[0] <= operation_end:
                             raise InvalidFlashRangeException(
-                                part_addr, 
+                                part_addr[0], 
                                 (partition_addr, operation_end)
                             )
                         
                         # If our operation starts within another partition's range
                         # (This is a simplification as we don't know other partitions' sizes)
-                        if part_addr < partition_addr and part_addr > addr:
+                        if part_addr[0] < partition_addr and part_addr[0] > addr:
                             raise InvalidFlashRangeException(
                                 addr,
-                                (part_addr, part_addr)  # We don't know the end
+                                (part_addr[0], part_addr[0])  # We don't know the end
                             )
             else:
                 raise InvalidNumberFormatException(partition)
@@ -121,7 +121,7 @@ class BoardHelper:
 
         # Check if partition name
         if number_or_str in self.defs['partition']:
-            return self.defs['partition'][number_or_str]
+            return self.defs['partition'][number_or_str][0]
 
         # Check if hex
         if number_or_str.startswith('0x'):
