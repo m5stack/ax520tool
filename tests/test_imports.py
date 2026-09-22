@@ -27,6 +27,9 @@ def test_imports():
         from ax520tool import Programmer
         from ax520tool import AX520ToolException
         
+        # Import UbootProgrammer
+        from ax520tool.UbootProgrammer import UbootProgrammer, TaskProgressBar
+        
         print("All imports successful!")
         return True
     except ImportError as e:

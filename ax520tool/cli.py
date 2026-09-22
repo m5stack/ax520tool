@@ -6,10 +6,18 @@ import argparse
 import logging
 import os
 import sys
+import tempfile
+import zipfile
+import glob
+import json
+import shutil
+import math
 from typing import List, Dict, Any, Optional, Tuple
 
 from .board_helper import BoardHelper
-from .programmer import Programmer, UbootProgrammer
+# from .programmer import Programmer, UbootProgrammer
+from .programmer import Programmer
+from .UbootProgrammer import UbootProgrammer
 from .config import DEFAULT_BOARD
 from .exceptions import (
     AX520ToolException,
@@ -57,6 +65,8 @@ def parse_args(args: List[str] = None) -> argparse.Namespace:
     parser.add_argument("-e", "--erase-env", help="Erase env partition before any operation", action="store_true")
     parser.add_argument("-v", "--verbose", help="Enable verbose logging", action="store_true")
     parser.add_argument("-u", "--uboot", help="Enable uboot programmer", action="store_true")
+    parser.add_argument("-i", "--image", help="ax520 Image file path")
+
 
     subparsers = parser.add_subparsers(dest='command', help='Operations')
 
@@ -255,6 +265,98 @@ def handle_erase_flash(args: argparse.Namespace, programmer: Programmer, board_h
     
     return True
 
+def handle_write_image(args: argparse.Namespace, programmer: Programmer, board_helper: BoardHelper) -> bool:
+    """
+    Handle write_image command.
+    Parse ax520_image file and flash comboot, kernel, rootfs in order.
+    
+    Args:
+        args: Parsed arguments
+        programmer: Programmer instance
+        board_helper: Board helper instance
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    # Check if image file path is provided
+    if not args.image:
+        logger.error("No image file path provided with -i option")
+        return False
+    
+    # Check if image file exists
+    if not os.path.exists(args.image):
+        logger.error(f"Image file not found: {args.image}")
+        return False
+    
+    temp_dir = tempfile.mkdtemp()
+    try:
+        with zipfile.ZipFile(args.image, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+        json_files = glob.glob(os.path.join(temp_dir, '*.json'))
+        if len(json_files) < 1:
+            logger.error(f"Invalid ax520_image file: {args.image}")
+            return False
+        with open(json_files[0], 'r') as f:
+            image_config = json.load(f)
+        if 'IMAGE_LIST' not in image_config:
+            logger.error(f"Invalid ax520_image file: {json_files[0]}")
+            return False
+        image_lists = image_config['IMAGE_LIST']
+        for index,image in enumerate(image_lists):
+            if 'comboot' == image['PARTITION']:
+                firmware_file = os.path.join(temp_dir, image['IMAGE_NAME'])
+                partition = image['PARTITION']
+                if 'IMAGE_ADDR' in image:
+                    address = int(image['IMAGE_ADDR'], 16)
+                else:
+                    address = board_helper.defs['partition'][partition]
+                logger.info(f"Downloading {firmware_file} to address {address:#010x}")
+                with open(firmware_file, 'rb') as f:
+                    firmware_data = f.read()
+                if not programmer.erase(address, math.ceil(len(firmware_data) / 65536) * 65536):
+                    logger.error("Failed to erase flash")
+                    return False
+                if not programmer.download_firmware(address, firmware_data, autostart=False):
+                    logger.error("Firmware download failed")
+                    return False
+                del image_lists[index]
+                if not args.uboot:
+                    programmer.run(board_helper.defs['flash_start_addr'])
+                    programmer.close_connection()
+                    programmer = UbootProgrammer(port_name=args.port, timeout=0.1)
+                    if not programmer.open_connection():
+                        logger.error("Failed to open serial port")
+                        return False
+                    
+                    logger.info("Starting handshake with the uboot...")
+                    if not programmer.handshake(timeout=10):
+                        logger.error("Handshake failed")
+                        programmer.close_connection()
+                        return False
+                break
+        
+        for image in image_lists:
+            firmware_file = os.path.join(temp_dir, image['IMAGE_NAME'])
+            partition = image['PARTITION']
+            if 'IMAGE_ADDR' in image:
+                address = int(image['IMAGE_ADDR'], 16)
+            else:
+                address = board_helper.defs['partition'][partition]
+            logger.info(f"Downloading {firmware_file} to address {address:#010x}")
+            with open(firmware_file, 'rb') as f:
+                firmware_data = f.read()
+            if not programmer.download_firmware(address, firmware_data, autostart=False):
+                logger.error("Firmware download failed")
+                return False
+    except Exception as e:
+        logger.error(f"Image file : {args.image} extra failed: {e}")
+        return False
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    
+    logger.info("All partitions flashed successfully")
+    return True
+
 
 def run_command(args: argparse.Namespace) -> bool:
     """
@@ -268,7 +370,11 @@ def run_command(args: argparse.Namespace) -> bool:
     """
     board_helper = BoardHelper(args.board)
     
-    if not args.command:
+    # If image option is provided, use image flashing mode
+    if args.image:
+        # Image flashing doesn't require a specific command
+        pass
+    elif not args.command:
         logger.error("No command specified")
         return False
     
@@ -299,6 +405,8 @@ def run_command(args: argparse.Namespace) -> bool:
             success = handle_read_flash(args, programmer, board_helper)
         elif args.command == 'erase_flash':
             success = handle_erase_flash(args, programmer, board_helper)
+        elif args.image:
+            success = handle_write_image(args, programmer, board_helper)
         else:
             logger.error(f"Unknown command: {args.command}")
             programmer.close_connection()

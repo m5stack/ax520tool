@@ -6,7 +6,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pyserial',
-        'tqdm'
+        'tqdm',
+        'ymodem'
     ],
     author='Xiao Han',
     author_email='hansh-sz@hotmail.com',
